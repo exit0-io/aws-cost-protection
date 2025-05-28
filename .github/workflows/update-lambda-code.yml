@@ -24,10 +24,7 @@ jobs:
           fetch-depth: 0
       
       - name: Generate CloudFormation template with embedded code and policies
-        run: |
-          
-          yq --version
-          
+        run: |          
           # Copy template to final file
           cp templates/aws-resource-governor.tpl.yaml aws-resource-governor.yaml
           
@@ -36,23 +33,23 @@ jobs:
           sed 's/^/          /' lambda_function.py > temp_indented.py
           sed -i '/# Python code here/r temp_indented.py' aws-resource-governor.yaml
           
-          # Initialize policies array
-          yq eval '.Resources.RestrictedIAMGroup.Properties.Policies = []' -i aws-resource-governor.yaml
-          
-          # Add each policy file
-          for policy_file in policies/*.json; do
-            if [ -f "$policy_file" ]; then
-              policy_name=$(basename "$policy_file" .json)
-              echo "Adding policy: $policy_name"
-              
-              # Add policy with proper YAML formatting
-              yq eval '.Resources.RestrictedIAMGroup.Properties.Policies += [{"PolicyName": "'$policy_name'", "PolicyDocument": load("'$policy_file'")}]' -i aws-resource-governor.yaml
-              
-              # Set indentation style for the policy document
-              policy_index=$(yq eval '.Resources.RestrictedIAMGroup.Properties.Policies | length - 1' aws-resource-governor.yaml)
-              yq eval '.Resources.RestrictedIAMGroup.Properties.Policies['$policy_index'].PolicyDocument style=""' -i aws-resource-governor.yaml
-            fi
-          done
+#          # Initialize policies array
+#          yq eval '.Resources.RestrictedIAMGroup.Properties.Policies = []' -i aws-resource-governor.yaml
+#
+#          # Add each policy file
+#          for policy_file in policies/*.json; do
+#            if [ -f "$policy_file" ]; then
+#              policy_name=$(basename "$policy_file" .json)
+#              echo "Adding policy: $policy_name"
+#
+#              # Add policy with proper YAML formatting
+#              yq eval '.Resources.RestrictedIAMGroup.Properties.Policies += [{"PolicyName": "'$policy_name'", "PolicyDocument": load("'$policy_file'")}]' -i aws-resource-governor.yaml
+#
+#              # Set indentation style for the policy document
+#              policy_index=$(yq eval '.Resources.RestrictedIAMGroup.Properties.Policies | length - 1' aws-resource-governor.yaml)
+#              yq eval '.Resources.RestrictedIAMGroup.Properties.Policies['$policy_index'].PolicyDocument style=""' -i aws-resource-governor.yaml
+#            fi
+#          done
           
           echo "✅ Successfully generated aws-resource-governor.yaml"
       
