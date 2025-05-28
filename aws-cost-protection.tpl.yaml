@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Cost Protection Stack - Automated cost controls and monitoring'
+
+Parameters:
+  AllowedRegions:
+    Type: CommaDelimitedList
+    Default: "us-east-1,us-west-2,eu-west-1,eu-central-1"
+    Description: List of AWS regions where resources can be created (comma-separated)
+    ConstraintDescription: Must be a comma-delimited list of valid AWS region names
+
+  ExecutionTimes:
+    Type: CommaDelimitedList
+    Default: "10,17,23"
+    Description: |
+      Times of day (in UTC) when cost protection should run, comma-separated (1-5 times allowed).
+      Examples: "9,21" (9 AM and 9 PM), "6,14,22" (every 8 hours), "8,12,16,20" (4 times daily).
+      
+      NOTE: All times are in UTC (24-hour format, 0-23).
+      To convert from your local time to UTC, use: https://www.timeanddate.com/worldclock/converter.html
+
+    AllowedPattern: '^([0-9]|1[0-9]|2[0-3])(,([0-9]|1[0-9]|2[0-3])){0,4}$'
+    ConstraintDescription: Must be 1-5 comma-separated hours in 24-hour format (0-23), e.g., "9,15,21"
+
+  RestrictedIAMGroup:
+    Type: String
+    Default: "developers"
+    Description: |
+      Choose the name of your IAM group where cost restriction policies will be applied.
+      
+    ConstraintDescription: Must be the name of an existing IAM group in your AWS account
+    AllowedPattern: '^[a-zA-Z0-9+=,.@_-]+$'
+    MaxLength: 128
+    MinLength: 1
+
+Resources:
+
+  # IAM Group for Restricted Access
+  RestrictedIAMGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Ref RestrictedIAMGroup
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
+      Policies: null
+
+  # IAM Role for Lambda Function
+  CostProtectionLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CostProtectionLambdaRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CostProtectionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:StopInstances
+                  - ec2:StartInstances
+                  - ec2:DescribeInstanceStatus
+                  - autoscaling:DescribeAutoScalingGroups
+                  - autoscaling:UpdateAutoScalingGroup
+                  - autoscaling:DescribeScalingActivities
+                  - logs:DescribeLogGroups
+                  - logs:PutRetentionPolicy
+                  - logs:DeleteLogGroup
+                  - sns:Publish
+                Resource: '*'
+
+  # Lambda Function for Cost Protection
+  CostProtectionLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: aws-cost-protection-function
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      Role: !GetAtt CostProtectionLambdaRole.Arn
+      Timeout: 300
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref BillingAlertTopic
+          ALLOWED_REGIONS: !Join [',', !Ref AllowedRegions]
+      Code:
+        ZipFile: null
+
+  # EventBridge Rule for configurable execution schedule
+  CostProtectionScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: cost-protection-schedule
+      Description: Trigger cost protection Lambda at specified UTC times
+      ScheduleExpression: !Sub 'cron(0 ${ExecutionTimes} * * ? *)'
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt CostProtectionLambda.Arn
+          Id: CostProtectionLambdaTarget
+
+  # Permission for EventBridge to invoke Lambda
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CostProtectionLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CostProtectionScheduleRule.Arn
+
+  # CloudWatch Log Group for Lambda
+  CostProtectionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${CostProtectionLambda}'
+      RetentionInDays: 30

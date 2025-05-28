@@ -1,0 +1,61 @@
+name: Generate AWS Resource Cost Protection Template
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lambda_function.py'
+      - 'aws-cost-protection.tpl.yaml'
+      - 'policies/*.json'
+
+jobs:
+  generate-template:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Generate CloudFormation template with embedded code and policies
+        run: |
+          # Copy template to final file
+          cp aws-cost-protection.tpl.yaml aws-resource-cost-protection.yaml
+          
+          # Embed Lambda function code
+          echo "Embedding Lambda function code..."
+          yq eval '.Resources.CostProtectionLambda.Properties.Code.ZipFile = load_str("lambda_function.py")' -i aws-resource-cost-protection.yaml
+          
+          # Initialize policies array
+          yq eval '.Resources.RestrictedIAMGroup.Properties.Policies = []' -i aws-resource-cost-protection.yaml
+          
+          # Add each policy file
+          for policy_file in policies/*.json; do
+            if [ -f "$policy_file" ]; then
+              policy_name=$(basename "$policy_file" .json)
+              echo "Adding policy: $policy_name"
+              
+              yq eval '.Resources.RestrictedIAMGroup.Properties.Policies += [{"PolicyName": "'$policy_name'", "PolicyDocument": load("'$policy_file'")}]' -i aws-resource-cost-protection.yaml
+            fi
+          done
+          
+          echo "✅ Successfully generated aws-resource-cost-protection.yaml"
+      
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+      
+      - name: Commit and push changes
+        run: |
+          git add aws-resource-cost-protection.yaml
+          git commit -m "Auto-generate: Create aws-resource-cost-protection.yaml from template"
+          
+          # Push to the main branch
+          git push origin HEAD:main
+      

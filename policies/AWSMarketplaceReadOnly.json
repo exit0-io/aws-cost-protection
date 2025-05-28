@@ -1,0 +1,18 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Resource": "*",
+        "Action": [
+          "aws-marketplace:Accept*",
+          "aws-marketplace:Cancel*",
+          "aws-marketplace:Create*",
+          "aws-marketplace:Reject*",
+          "aws-marketplace:Subscribe*",
+          "aws-marketplace:Unsubscribe*",
+          "aws-marketplace:Update*"
+        ],
+        "Effect": "Deny"
+      }
+    ]
+  }
