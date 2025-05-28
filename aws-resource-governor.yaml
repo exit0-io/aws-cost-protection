@@ -9,7 +9,7 @@ Parameters:
     ConstraintDescription: Must be a comma-delimited list of valid AWS region names
 
   ExecutionTimes:
-    Type: CommaDelimitedList
+    Type: String
     Default: "10,17,23"
     Description: |
       Times of day (in UTC) when resource governance should run, comma-separated (1-5 times allowed).
