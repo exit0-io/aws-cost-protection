@@ -21,7 +21,7 @@ Parameters:
     AllowedPattern: '^([0-9]|1[0-9]|2[0-3])(,([0-9]|1[0-9]|2[0-3])){0,4}$'
     ConstraintDescription: Must be 1-5 comma-separated hours in 24-hour format (0-23), e.g., "9,15,21"
 
-  RestrictedIAMGroup:
+  IAMGroup:
     Type: String
     Default: "developers"
     Description: |
@@ -37,7 +37,7 @@ Resources:
   RestrictedIAMGroup:
     Type: AWS::IAM::Group
     Properties:
-      GroupName: !Ref RestrictedIAMGroup
+      GroupName: !Ref IAMGroup
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AdministratorAccess'
       Policies:
