@@ -16,7 +16,7 @@ Parameters:
   AllowedRegions:
     Type: CommaDelimitedList
     Default: "us-east-1,us-west-2,eu-central-1"
-    AllowedPattern: '^([a-zA-Z0-9-])(,[a-zA-Z0-9-]+)+$'
+    AllowedPattern: '^([a-zA-Z0-9-]+)(,[a-zA-Z0-9-]+)+$'
     Description: List of AWS regions where you want to operate (comma-separated). At least 2 regions required.
     ConstraintDescription: Must be a comma-delimited list of valid AWS region names
 
