@@ -1,7 +1,7 @@
 """
-AWS Resource Cost Protection Lambda Function
+AWS Resource Governor Lambda Function
 
-This function automatically manages AWS resources to control costs:
+This function automatically manages AWS resources to control costs and enforce governance:
 - Stops running EC2 instances (except protected ones)
 - Scales down Auto Scaling Groups to zero
 
@@ -15,11 +15,11 @@ from typing import List, Dict, Any
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    print(f"Resource Cost Protection Lambda triggered at {datetime.now(timezone.utc)}")
+    print(f"Resource Governor Lambda triggered at {datetime.now(timezone.utc)}")
     
     # Get allowed regions from environment variable
     allowed_regions = get_allowed_regions()
-    print(f"Processing cost protection across regions: {allowed_regions}")
+    print(f"Processing resource governance across regions: {allowed_regions}")
     
     # Aggregate results across all regions
     aggregate_results = {
@@ -66,7 +66,7 @@ def get_allowed_regions() -> List[str]:
 
 def process_region(region: str) -> Dict[str, List[str]]:
     """
-    Process cost protection for a specific region.
+    Process resource governance for a specific region.
     
     Args:
         region: AWS region name
@@ -107,7 +107,7 @@ def process_region(region: str) -> Dict[str, List[str]]:
 
 def is_instance_stop_protected(ec2, instance_id: str) -> bool:
     """
-    Check if an EC2 instance has stop protection enabled.
+    Check if an EC2 instance has stop protection enabled via API or custom tags.
     
     Args:
         ec2: Boto3 EC2 client
@@ -117,13 +117,61 @@ def is_instance_stop_protected(ec2, instance_id: str) -> bool:
         True if instance has stop protection, False otherwise
     """
     try:
+        # Check API stop protection
         response = ec2.describe_instance_attribute(
             InstanceId=instance_id,
             Attribute='disableApiStop'
         )
-        return response.get('DisableApiStop', {}).get('Value', False)
+        if response.get('DisableApiStop', {}).get('Value', False):
+            return True
+        
+        # Check custom ResourceGovernance tag
+        tags_response = ec2.describe_tags(
+            Filters=[
+                {'Name': 'resource-id', 'Values': [instance_id]},
+                {'Name': 'key', 'Values': ['ResourceGovernance']}
+            ]
+        )
+        
+        for tag in tags_response.get('Tags', []):
+            if tag.get('Value', '').lower() == 'keep':
+                return True
+        
+        return False
+        
     except Exception as e:
         print(f"Error checking stop protection for instance {instance_id}: {str(e)}")
+        # If we can't determine protection status, assume it's protected to be safe
+        return True
+
+
+def is_asg_protected(autoscaling, asg_name: str) -> bool:
+    """
+    Check if an Auto Scaling Group has protection via custom tags.
+    
+    Args:
+        autoscaling: Boto3 Auto Scaling client
+        asg_name: Auto Scaling Group name
+        
+    Returns:
+        True if ASG has protection, False otherwise
+    """
+    try:
+        response = autoscaling.describe_tags(
+            Filters=[
+                {'Name': 'auto-scaling-group', 'Values': [asg_name]},
+                {'Name': 'key', 'Values': ['ResourceGovernance']}
+            ]
+        )
+        
+        for tag in response.get('Tags', []):
+            if tag.get('Value', '').lower() == 'keep':
+                return True
+        
+        return False
+        
+    except Exception as e:
+        print(f"Error checking protection for ASG {asg_name}: {str(e)}")
         # If we can't determine protection status, assume it's protected to be safe
         return True
 
@@ -194,6 +242,11 @@ def scale_down_asgs(autoscaling, region: str) -> List[str]:
             for asg in page['AutoScalingGroups']:
                 asg_name = asg['AutoScalingGroupName']
                 current_capacity = asg['DesiredCapacity']
+                
+                # Check if ASG is protected
+                if is_asg_protected(autoscaling, asg_name):
+                    print(f"Skipping protected ASG: {asg_name} (capacity: {current_capacity}) in region {region}")
+                    continue
                 
                 if current_capacity > 0:
                     try:

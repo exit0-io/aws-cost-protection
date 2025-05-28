@@ -1,4 +1,4 @@
-name: Generate AWS Resource Cost Protection Template
+name: Generate AWS Resource Governor Template
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - 'lambda_function.py'
-      - 'aws-cost-protection.tpl.yaml'
+      - 'aws-resource-governor.tpl.yaml'
       - 'policies/*.json'
 
 jobs:
@@ -25,14 +25,14 @@ jobs:
       - name: Generate CloudFormation template with embedded code and policies
         run: |
           # Copy template to final file
-          cp aws-cost-protection.tpl.yaml aws-resource-cost-protection.yaml
+          cp aws-resource-governor.tpl.yaml aws-resource-governor.yaml
           
           # Embed Lambda function code
           echo "Embedding Lambda function code..."
-          yq eval '.Resources.CostProtectionLambda.Properties.Code.ZipFile = load_str("lambda_function.py")' -i aws-resource-cost-protection.yaml
+          yq eval '.Resources.ResourceGovernorLambda.Properties.Code.ZipFile = load_str("lambda_function.py")' -i aws-resource-governor.yaml
           
           # Initialize policies array
-          yq eval '.Resources.RestrictedIAMGroup.Properties.Policies = []' -i aws-resource-cost-protection.yaml
+          yq eval '.Resources.RestrictedIAMGroup.Properties.Policies = []' -i aws-resource-governor.yaml
           
           # Add each policy file
           for policy_file in policies/*.json; do
@@ -40,11 +40,11 @@ jobs:
               policy_name=$(basename "$policy_file" .json)
               echo "Adding policy: $policy_name"
               
-              yq eval '.Resources.RestrictedIAMGroup.Properties.Policies += [{"PolicyName": "'$policy_name'", "PolicyDocument": load("'$policy_file'")}]' -i aws-resource-cost-protection.yaml
+              yq eval '.Resources.RestrictedIAMGroup.Properties.Policies += [{"PolicyName": "'$policy_name'", "PolicyDocument": load("'$policy_file'")}]' -i aws-resource-governor.yaml
             fi
           done
           
-          echo "✅ Successfully generated aws-resource-cost-protection.yaml"
+          echo "✅ Successfully generated aws-resource-governor.yaml"
       
       - name: Configure Git
         run: |
@@ -53,9 +53,10 @@ jobs:
       
       - name: Commit and push changes
         run: |
-          git add aws-resource-cost-protection.yaml
-          git commit -m "Auto-generate: Create aws-resource-cost-protection.yaml from template"
+          git add aws-resource-governor.yaml
+          git commit -m "Auto-generate: Create aws-resource-governor.yaml from template"
           
           # Push to the main branch
           git push origin HEAD:main
+      
       
