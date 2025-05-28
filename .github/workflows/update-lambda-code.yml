@@ -8,6 +8,7 @@ on:
       - 'lambda_function.py'
       - 'aws-resource-governor.tpl.yaml'
       - 'policies/*.json'
+  workflow_dispatch:
 
 jobs:
   generate-template:
