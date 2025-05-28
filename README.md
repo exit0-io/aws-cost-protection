@@ -1,39 +1,63 @@
 # AWS Resource Governor
 
-An automated resource management and cost control system for AWS accounts that helps prevent unexpected charges through resource monitoring, automatic shutdowns, and policy enforcement.
+New AWS users often make simple mistakes that can accidentally lead to high bills — like forgetting to shut down an EC2 instance or choosing an expensive disk by mistake.
+To help you avoid that, we provide a ready-made **automation** that protects your account from these common issues.
 
-## Features
+This automation includes:
 
-- 🛑 **Automated Resource Management**: Stops EC2 instances and scales down ASGs twice daily
-- 🔒 **IAM Policies**: Restricts expensive instance types and services
-- 🌍 **Region Controls**: Limits resource creation to specified regions
+- ✅ Modifies your IAM group to restrict from launching large or expensive instance types and volumes.
+- ✅ Automatic shutdown of EC2 instances multiple times a day (you'll decide when), to avoid idle costs.
+- ✅ Auto Scaling Groups (ASG) set to zero multiple times a day.
 
-## Quick Start
+This automation is deployed using a **CloudFormation template** — an AWS tool that sets everything up for you, safely and automatically.
 
-TBD
+> [!NOTE]
+> This is **not a full protection system for your AWS account**.
+> It only covers common services and usage patterns relevant to this course.
+
+> [!WARNING]
+> This automation will **affect all resources in the selected regions in your AWS account** — including ones you may have created before this course.
+> If your AWS account is already being used for other purposes, **proceed with caution**, as existing resources may be stopped or modified.
+
+## Quick setup
+
+1. Open the AWS CloudFormation console at https://console.aws.amazon.com/cloudformation
+2. On the navigation bar at the top of the screen, choose the AWS Region to create the stack in.
+3. On the **Stacks** page, choose **Create stack** at top right, and then choose **With new resources (standard)**.
+
+On the **Create stack** page, do one of the following:
+
+1. Choose **Choose an existing template**. Then, under **Specify template**, choose **Upload a template file**.
+2. Choose **Choose File** to choose a template file from your local computer. 
+3. Once you have chosen your template, CloudFormation uploads the file and displays the S3 URL.
+4. Choose **Next** to continue and to validate the template.
+5. On the **Specify stack details** page, under **Stack name** type name to your stack, e.g. `aws-resource-governor`.
+6. In the Parameters section, specify values for the following configurations:
+   - **IAMGroup** - Name of the IAM group that you want to restrict. You should type the IAM group you created for your IAM user.
+   - **AllowedRegions** - List of AWS regions where you want to operate. At least 2 regions required.
+7. Choose **Next**.
+8. In the **Configure stack options** page, keep the default configurations, and choose **I acknowledge that this template may create IAM resources**.
+9. Choose **Next** to continue.
+10. On the **Review and create** page, review the details of your stack, and choose **Submit**.
+
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `NotificationEmail` | String | Required | Email address for billing alerts |
-| `IAMGroupToProtect` | String | `students` | Name of the IAM group to apply resource governance policies |
-| `AllowedRegions` | CommaDelimitedList | `us-east-1,us-west-2,eu-west-1,eu-central-1` | AWS regions where resources can be created |
+| IAMGroup | String | "developers" | Choose the name of your IAM group where resource restriction policies will be applied. Must be the name of an existing IAM group in your AWS account. |
+| AutoShutdownHours | String | "10,17,23" | Times of day (in UTC) when instance shutdown automation should run, comma-separated (1-5 times allowed). Examples: "9,21" (9 AM and 9 PM), "6,14,22" (every 8 hours), "8,12,16,20" (4 times daily). All times are in UTC (24-hour format, 0-23). |
+
 
 
 ## Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐
-│   EventBridge   │───▶│   Lambda        │
-│   (Scheduler)   │    │   Function      │
-└─────────────────┘    └─────────────────┘
-                              │           
-                              ▼           
-                       ┌─────────────────┐
-                       │   EC2/ASG       │
-                       │   Management    │
-                       └─────────────────┘ 
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   EventBridge   │───▶│   Lambda        │───▶│   EC2/ASG       │
+│   (Scheduler)   │    │   Function      │    │   Shutdown      │
+└─────────────────┘    └─────────────────┘    └─────────────────┘ 
+                  
 ```
 
 
