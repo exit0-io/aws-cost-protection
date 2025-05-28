@@ -16,9 +16,12 @@ from typing import List, Dict, Any
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     print(f"Resource Governor Lambda triggered at {datetime.now(timezone.utc)}")
-
-    # Get all enabled regions dynamically
-    print("Discovering all enabled regions...")
+    
+    # Get target regions from environment variable
+    target_regions_env = os.environ.get('TARGET_REGIONS', '*')
+    print(f"Target regions configuration: {target_regions_env}")
+    
+    # Always get available regions first for validation
     try:
         ec2_client = boto3.client('ec2')
         regions_response = ec2_client.describe_regions(
@@ -26,18 +29,44 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 {'Name': 'opt-in-status', 'Values': ['opt-in-not-required', 'opted-in']}
             ]
         )
-        allowed_regions = [region['RegionName'] for region in regions_response['Regions']]
-        print(f"Discovered enabled regions: {allowed_regions}")
+        available_regions = [region['RegionName'] for region in regions_response['Regions']]
+        print(f"Available enabled regions: {available_regions}")
     except Exception as e:
-        error_msg = f"Failed to discover enabled regions: {str(e)}"
+        error_msg = f"Failed to discover available regions: {str(e)}"
         print(error_msg)
         return {
             'statusCode': 500,
             'body': json.dumps({
                 'error': error_msg,
-                'message': 'Resource governance failed - could not discover enabled regions'
+                'message': 'Resource governance failed - could not discover available regions'
             })
         }
+    
+    if target_regions_env == '*':
+        # Use all available enabled regions
+        allowed_regions = available_regions
+        print(f"Using all available regions: {allowed_regions}")
+    else:
+        # Parse and validate specified regions
+        specified_regions = [region.strip() for region in target_regions_env.split(',') if region.strip()]
+        
+        # Validate that all specified regions are available
+        invalid_regions = [region for region in specified_regions if region not in available_regions]
+        if invalid_regions:
+            error_msg = f"Invalid or unavailable regions specified: {invalid_regions}. Available regions: {available_regions}"
+            print(error_msg)
+            return {
+                'statusCode': 400,
+                'body': json.dumps({
+                    'error': error_msg,
+                    'message': 'Resource governance failed - invalid regions specified'
+                })
+            }
+        
+        allowed_regions = specified_regions
+        print(f"Using validated specified regions: {allowed_regions}")
+
+    print(f"Processing resource governance across regions: {allowed_regions}")
 
     # Aggregate results across all regions
     aggregate_results = {

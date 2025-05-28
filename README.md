@@ -1,6 +1,6 @@
 # AWS Resource Governor
 
-New AWS users often make simple mistakes that can accidentally lead to high bills — like forgetting to shut down an EC2 instance or choosing an expensive disk by mistake.
+New AWS users often make simple mistakes that can accidentally lead to high bills — like forgetting to shut down an EC2 instance or choosing an expensive disk.
 To help you avoid that, we provide a ready-made **automation** that protects your account from these common issues.
 
 This automation includes:
@@ -34,20 +34,12 @@ On the **Create stack** page, do one of the following:
 5. On the **Specify stack details** page, under **Stack name** type name to your stack, e.g. `aws-resource-governor`.
 6. In the Parameters section, specify values for the following configurations:
    - **IAMGroup** - Name of the IAM group that you want to restrict. You should type the IAM group you created for your IAM user.
-   - **AllowedRegions** - List of AWS regions where you want to operate. At least 2 regions required.
+   - **AutoShutdownHours** - Times of day (in UTC) when instance shutdown automation should run.
+   - **AllowedRegions** - List of AWS regions where you want the automation to operate.
 7. Choose **Next**.
 8. In the **Configure stack options** page, keep the default configurations, and choose **I acknowledge that this template may create IAM resources**.
 9. Choose **Next** to continue.
 10. On the **Review and create** page, review the details of your stack, and choose **Submit**.
-
-
-## Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| IAMGroup | String | "developers" | Choose the name of your IAM group where resource restriction policies will be applied. Must be the name of an existing IAM group in your AWS account. |
-| AutoShutdownHours | String | "10,17,23" | Times of day (in UTC) when instance shutdown automation should run, comma-separated (1-5 times allowed). Examples: "9,21" (9 AM and 9 PM), "6,14,22" (every 8 hours), "8,12,16,20" (4 times daily). All times are in UTC (24-hour format, 0-23). |
-
 
 
 ## Architecture
@@ -59,9 +51,3 @@ On the **Create stack** page, do one of the following:
 └─────────────────┘    └─────────────────┘    └─────────────────┘ 
                   
 ```
-
-
-## License
-
-This project is open source and available under the [MIT License](LICENSE).
-
