@@ -30,6 +30,7 @@ jobs:
           # Embed Lambda function code
           echo "Embedding Lambda function code..."
           yq eval '.Resources.ResourceGovernorLambda.Properties.Code.ZipFile = load_str("lambda_function.py")' -i aws-resource-governor.yaml
+          yq eval '.Resources.ResourceGovernorLambda.Properties.Code.ZipFile style="literal"' -i aws-resource-governor.yaml
           
           # Initialize policies array
           yq eval '.Resources.RestrictedIAMGroup.Properties.Policies = []' -i aws-resource-governor.yaml
@@ -40,7 +41,12 @@ jobs:
               policy_name=$(basename "$policy_file" .json)
               echo "Adding policy: $policy_name"
               
+              # Add policy with proper YAML formatting
               yq eval '.Resources.RestrictedIAMGroup.Properties.Policies += [{"PolicyName": "'$policy_name'", "PolicyDocument": load("'$policy_file'")}]' -i aws-resource-governor.yaml
+              
+              # Set indentation style for the policy document
+              policy_index=$(yq eval '.Resources.RestrictedIAMGroup.Properties.Policies | length - 1' aws-resource-governor.yaml)
+              yq eval '.Resources.RestrictedIAMGroup.Properties.Policies['$policy_index'].PolicyDocument style=""' -i aws-resource-governor.yaml
             fi
           done
           
