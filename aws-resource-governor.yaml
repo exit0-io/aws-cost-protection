@@ -13,13 +13,6 @@ Parameters:
     MaxLength: 128
     MinLength: 1
 
-  AllowedRegions:
-    Type: CommaDelimitedList
-    Default: "us-east-1,us-west-2,eu-central-1"
-    AllowedPattern: '^([a-zA-Z0-9-]+)(,[a-zA-Z0-9-]+)+$'
-    Description: List of AWS regions where you want to operate (comma-separated). At least 2 regions required.
-    ConstraintDescription: Must be a comma-delimited list of valid AWS region names
-
   AutoShutdownHours:
     Type: String
     Default: "10,17,23"
@@ -31,148 +24,116 @@ Parameters:
       To convert from your local time to UTC, use: https://www.timeanddate.com/worldclock/converter.html
 
     AllowedPattern: '^([0-9]|1[0-9]|2[0-3])(,([0-9]|1[0-9]|2[0-3])){0,4}$'
+    ConstraintDescription: Must be a comma-separated list of valid UTC hours (0-23) with 1-5 entries
 
 Resources:
-  # IAM Group for Restricted Access
-  RestrictedIAMGroup:
-    Type: AWS::IAM::Group
+  # IAM Policies for Existing Restricted Group
+  DenyDynamoDBReservedCapacityPolicy:
+    Type: AWS::IAM::Policy
     Properties:
-      GroupName: !Ref IAMGroup
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AdministratorAccess'
-      Policies:
-        - PolicyName: DenyDynamoDBReservedCapacityPurchases
-          PolicyDocument: |
+      PolicyName: DenyDynamoDBReservedCapacityPurchases
+      Groups:
+        - !Ref IAMGroup
+      PolicyDocument: | 
+        {
+          "Version": "2012-10-17",
+          "Statement": [
             {
-              "Version": "2012-10-17",
-              "Statement": [
-                {
-                  "Sid": "DenyReservedCapacityPurchases",
-                  "Effect": "Deny",
-                  "Action": "dynamodb:PurchaseReservedCapacityOfferings",
-                  "Resource": "arn:aws:dynamodb:*:*:*"
-                }
-              ]
+              "Sid": "DenyReservedCapacityPurchases",
+              "Effect": "Deny",
+              "Action": "dynamodb:PurchaseReservedCapacityOfferings",
+              "Resource": "arn:aws:dynamodb:*:*:*"
             }
-        - PolicyName: DisableRegions
-          PolicyDocument: |
-            {
-              "Version": "2012-10-17",
-              "Statement": [
-                {
-                "Sid": "EnableDisable",
-                "Effect": "Deny",
-                "Action": [
-                    "account:EnableRegion"
-                ],
-                "Resource": "*",
-                "Condition": {
-                    "ForAnyValue:StringNotLike": {
-                    "account:TargetRegion": "!Ref AllowedRegions"
-                    }
-                }
-                },
-                {
-                "Sid": "DenyAllOutsideRequestedRegions",
-                "Effect": "Deny",
-                "NotAction": [
-                    "cloudfront:*",
-                    "iam:*",
-                    "route53:*",
-                    "support:*"
-                ],
-                "Resource": "*",
-                "Condition": {
-                    "ForAnyValue:StringNotLike": {
-                    "aws:RequestedRegion": "!Ref AllowedRegions"
-                    }
-                }
-                }
-              ] 
-            }
+          ]
+        }
 
-        - PolicyName: LimitEC2
-          PolicyDocument: |    
+  LimitEC2Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: LimitEC2
+      Groups:
+        - !Ref IAMGroup
+      PolicyDocument: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
             {
-              "Version": "2012-10-17",
-              "Statement": [
-                {
-                  "Sid": "DenyLargeInstanceTypes",
-                  "Effect": "Deny",
-                  "Action": [
-                    "ec2:RunInstances",
-                    "ec2:ModifyInstanceAttribute"
-                  ],
-                  "Resource": [
-                    "arn:aws:ec2:*:*:instance/*"
-                  ],
-                  "Condition": {
-                    "ForAnyValue:StringNotLike": {
-                      "ec2:InstanceType": [
-                        "t2.nano",
-                        "t2.micro", 
-                        "t2.small",
-                        "t2.medium",
-                        "t3.nano",
-                        "t3.micro",
-                        "t3.small", 
-                        "t3.medium",
-                        "t4g.nano",
-                        "t4g.micro",
-                        "t4g.small",
-                        "t4g.medium"
-                      ]
-                    }
-                  }
-                },
-                {
-                  "Sid": "DenyReservedInstances",
-                  "Effect": "Deny",
-                  "Action": [
-                    "ec2:ModifyReservedInstances",
-                    "ec2:PurchaseReservedInstancesOffering"
-                  ],
-                  "Resource": "*"
-                },
-                {
-                  "Sid": "LimitInstanceVolumeType",
-                  "Effect": "Deny",
-                  "Action": "ec2:*",
-                  "Resource": "*",
-                  "Condition": {
-                    "ForAnyValue:StringNotLike": {
-                      "ec2:VolumeType": [
-                        "gp2",
-                        "gp3",
-                        "standard"
-                      ]
-                    }
-                  }
-                },
-                {
-                  "Sid": "LimitVolumeSize",
-                  "Effect": "Deny",
-                  "Action": "ec2:*",
-                  "Resource": "*",
-                  "Condition": {
-                    "NumericGreaterThan": {
-                      "ec2:VolumeSize": "30"
-                    }
-                  }
-                },
-                {
-                  "Sid": "LimitVolumeModificationSize", 
-                  "Effect": "Deny",
-                  "Action": "ec2:*",
-                  "Resource": "*",
-                  "Condition": {
-                    "NumericGreaterThan": {
-                      "ec2:TargetVolumeSize": "30"
-                    }
-                  }
+              "Sid": "DenyLargeInstanceTypes",
+              "Effect": "Deny",
+              "Action": [
+                "ec2:RunInstances",
+                "ec2:ModifyInstanceAttribute"
+              ],
+              "Resource": [
+                "arn:aws:ec2:*:*:instance/*"
+              ],
+              "Condition": {
+                "ForAnyValue:StringNotLike": {
+                  "ec2:InstanceType": [
+                    "t2.nano",
+                    "t2.micro",
+                    "t2.small",
+                    "t2.medium",
+                    "t3.nano",
+                    "t3.micro",
+                    "t3.small",
+                    "t3.medium",
+                    "t4g.nano",
+                    "t4g.micro",
+                    "t4g.small",
+                    "t4g.medium"
+                  ]
                 }
-              ]
+              }
+            },
+            {
+              "Sid": "DenyReservedInstances",
+              "Effect": "Deny",
+              "Action": [
+                "ec2:ModifyReservedInstances",
+                "ec2:PurchaseReservedInstancesOffering"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "LimitInstanceVolumeType",
+              "Effect": "Deny",
+              "Action": "ec2:*",
+              "Resource": "*",
+              "Condition": {
+                "ForAnyValue:StringNotLike": {
+                  "ec2:VolumeType": [
+                    "gp2",
+                    "gp3",
+                    "standard"
+                  ]
+                }
+              }
+            },
+            {
+              "Sid": "LimitVolumeSize",
+              "Effect": "Deny",
+              "Action": "ec2:*",
+              "Resource": "*",
+              "Condition": {
+                "NumericGreaterThan": {
+                  "ec2:VolumeSize": "30"
+                }
+              }
+            },
+            {
+              "Sid": "LimitVolumeModificationSize",
+              "Effect": "Deny",
+              "Action": "ec2:*",
+              "Resource": "*",
+              "Condition": {
+                "NumericGreaterThan": {
+                  "ec2:TargetVolumeSize": "30"
+                }
+              }
             }
+          ]
+        }
 
   # IAM Role for Lambda Function
   ResourceGovernorLambdaRole:
@@ -214,7 +175,7 @@ Resources:
     Properties:
       Name: resource-governor-schedule
       Description: Trigger resource governance Lambda at specified UTC times
-      ScheduleExpression: !Sub 'cron(0 ${ExecutionTimes} * * ? *)'
+      ScheduleExpression: !Sub 'cron(0 ${AutoShutdownHours} * * ? *)'
       State: ENABLED
       Targets:
         - Arn: !GetAtt ResourceGovernorLambda.Arn
@@ -245,9 +206,6 @@ Resources:
       Handler: index.lambda_handler
       Role: !GetAtt ResourceGovernorLambdaRole.Arn
       Timeout: 300
-      Environment:
-        Variables:
-          ALLOWED_REGIONS: !Join [',', !Ref AllowedRegions]
       Code:
         ZipFile: |
           """
@@ -268,11 +226,29 @@ Resources:
           
           def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
               print(f"Resource Governor Lambda triggered at {datetime.now(timezone.utc)}")
-              
-              # Get allowed regions from environment variable
-              allowed_regions = get_allowed_regions()
-              print(f"Processing resource governance across regions: {allowed_regions}")
-              
+          
+              # Get all enabled regions dynamically
+              print("Discovering all enabled regions...")
+              try:
+                  ec2_client = boto3.client('ec2')
+                  regions_response = ec2_client.describe_regions(
+                      Filters=[
+                          {'Name': 'opt-in-status', 'Values': ['opt-in-not-required', 'opted-in']}
+                      ]
+                  )
+                  allowed_regions = [region['RegionName'] for region in regions_response['Regions']]
+                  print(f"Discovered enabled regions: {allowed_regions}")
+              except Exception as e:
+                  error_msg = f"Failed to discover enabled regions: {str(e)}"
+                  print(error_msg)
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({
+                          'error': error_msg,
+                          'message': 'Resource governance failed - could not discover enabled regions'
+                      })
+                  }
+          
               # Aggregate results across all regions
               aggregate_results = {
                   'stopped_instances': [],
@@ -280,19 +256,19 @@ Resources:
                   'errors': [],
                   'regions_processed': []
               }
-              
+          
               # Process each allowed region
               for region in allowed_regions:
                   try:
                       print(f"Processing region: {region}")
                       region_results = process_region(region)
-                      
+          
                       # Aggregate results
                       aggregate_results['stopped_instances'].extend(region_results['stopped_instances'])
                       aggregate_results['scaled_down_asgs'].extend(region_results['scaled_down_asgs'])
                       aggregate_results['errors'].extend(region_results['errors'])
                       aggregate_results['regions_processed'].append(region)
-                      
+          
                   except Exception as e:
                       error_msg = f"Error processing region {region}: {str(e)}"
                       print(error_msg)
@@ -304,67 +280,55 @@ Resources:
               }
           
           
-          def get_allowed_regions() -> List[str]:
-              """
-              Get the list of allowed regions from environment variable.
-              
-              Returns:
-                  List of allowed AWS region names
-              """
-              allowed_regions_str = os.environ.get('ALLOWED_REGIONS', 'us-east-1')
-              regions = [region.strip() for region in allowed_regions_str.split(',') if region.strip()]
-              return regions
-          
-          
           def process_region(region: str) -> Dict[str, List[str]]:
               """
               Process resource governance for a specific region.
-              
+          
               Args:
                   region: AWS region name
-                  
+          
               Returns:
                   Dict containing regional results
               """
               print(f"Initializing AWS clients for region: {region}")
-              
+          
               # Initialize region-specific AWS clients
               ec2 = boto3.client('ec2', region_name=region)
               autoscaling = boto3.client('autoscaling', region_name=region)
-              
+          
               region_results = {
                   'stopped_instances': [],
                   'scaled_down_asgs': [],
                   'errors': []
               }
-              
+          
               try:
                   # 1. Stop running EC2 instances (except those with specific tags)
                   stopped_instances = stop_idle_instances(ec2, region)
                   region_results['stopped_instances'] = stopped_instances
-                  
+          
                   # 2. Scale down Auto Scaling Groups to zero
                   scaled_down_asgs = scale_down_asgs(autoscaling, region)
                   region_results['scaled_down_asgs'] = scaled_down_asgs
-                  
+          
                   print(f"Region {region} processing completed - Instances: {len(stopped_instances)}, ASGs: {len(scaled_down_asgs)}")
-                  
+          
               except Exception as e:
                   error_msg = f"Error processing region {region}: {str(e)}"
                   print(error_msg)
                   region_results['errors'].append(error_msg)
-              
+          
               return region_results
           
           
           def is_instance_stop_protected(ec2, instance_id: str) -> bool:
               """
               Check if an EC2 instance has stop protection enabled via API or custom tags.
-              
+          
               Args:
                   ec2: Boto3 EC2 client
                   instance_id: EC2 instance ID
-                  
+          
               Returns:
                   True if instance has stop protection, False otherwise
               """
@@ -376,7 +340,7 @@ Resources:
                   )
                   if response.get('DisableApiStop', {}).get('Value', False):
                       return True
-                  
+          
                   # Check custom ResourceGovernance tag
                   tags_response = ec2.describe_tags(
                       Filters=[
@@ -384,13 +348,13 @@ Resources:
                           {'Name': 'key', 'Values': ['ResourceGovernance']}
                       ]
                   )
-                  
+          
                   for tag in tags_response.get('Tags', []):
                       if tag.get('Value', '').lower() == 'keep':
                           return True
-                  
+          
                   return False
-                  
+          
               except Exception as e:
                   print(f"Error checking stop protection for instance {instance_id}: {str(e)}")
                   # If we can't determine protection status, assume it's protected to be safe
@@ -400,11 +364,11 @@ Resources:
           def is_asg_protected(autoscaling, asg_name: str) -> bool:
               """
               Check if an Auto Scaling Group has protection via custom tags.
-              
+          
               Args:
                   autoscaling: Boto3 Auto Scaling client
                   asg_name: Auto Scaling Group name
-                  
+          
               Returns:
                   True if ASG has protection, False otherwise
               """
@@ -415,13 +379,13 @@ Resources:
                           {'Name': 'key', 'Values': ['ResourceGovernance']}
                       ]
                   )
-                  
+          
                   for tag in response.get('Tags', []):
                       if tag.get('Value', '').lower() == 'keep':
                           return True
-                  
+          
                   return False
-                  
+          
               except Exception as e:
                   print(f"Error checking protection for ASG {asg_name}: {str(e)}")
                   # If we can't determine protection status, assume it's protected to be safe
@@ -431,16 +395,16 @@ Resources:
           def stop_idle_instances(ec2, region: str) -> List[str]:
               """
               Stop all running EC2 instances except those with stop protection enabled.
-              
+          
               Args:
                   ec2: Boto3 EC2 client
                   region: AWS region name
-                  
+          
               Returns:
                   List of stopped instance IDs
               """
               stopped_instances = []
-              
+          
               try:
                   # Get all running instances
                   response = ec2.describe_instances(
@@ -448,17 +412,17 @@ Resources:
                           {'Name': 'instance-state-name', 'Values': ['running']}
                       ]
                   )
-                  
+          
                   for reservation in response['Reservations']:
                       for instance in reservation['Instances']:
                           instance_id = instance['InstanceId']
                           instance_type = instance.get('InstanceType', 'unknown')
-                          
+          
                           # Check if instance has stop protection
                           if is_instance_stop_protected(ec2, instance_id):
                               print(f"Skipping protected instance: {instance_id} (type: {instance_type}) in region {region}")
                               continue
-                          
+          
                           try:
                               ec2.stop_instances(InstanceIds=[instance_id])
                               stopped_instances.append(f"{instance_id} ({region})")
@@ -469,37 +433,37 @@ Resources:
           
               except Exception as e:
                   print(f"Error stopping instances in {region}: {str(e)}")
-              
+          
               return stopped_instances
           
           
           def scale_down_asgs(autoscaling, region: str) -> List[str]:
               """
               Scale down all Auto Scaling Groups to zero capacity except protected ones.
-              
+          
               Args:
                   autoscaling: Boto3 Auto Scaling client
                   region: AWS region name
-                  
+          
               Returns:
                   List of scaled down ASG names
               """
               scaled_down_asgs = []
-              
+          
               try:
                   # Get all Auto Scaling Groups
                   paginator = autoscaling.get_paginator('describe_auto_scaling_groups')
-                  
+          
                   for page in paginator.paginate():
                       for asg in page['AutoScalingGroups']:
                           asg_name = asg['AutoScalingGroupName']
                           current_capacity = asg['DesiredCapacity']
-                          
+          
                           # Check if ASG is protected
                           if is_asg_protected(autoscaling, asg_name):
                               print(f"Skipping protected ASG: {asg_name} (capacity: {current_capacity}) in region {region}")
                               continue
-                          
+          
                           if current_capacity > 0:
                               try:
                                   autoscaling.update_auto_scaling_group(
@@ -515,8 +479,8 @@ Resources:
                                   print(error_msg)
                           else:
                               print(f"ASG already at zero capacity: {asg_name} in region {region}")
-              
+          
               except Exception as e:
                   print(f"Error scaling down ASGs in {region}: {str(e)}")
-              
+          
               return scaled_down_asgs
