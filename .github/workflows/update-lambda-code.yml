@@ -30,7 +30,8 @@ jobs:
           
           # Embed Lambda function code
           echo "Embedding Lambda function code..."
-          yq eval '.Resources.ResourceGovernorLambda.Properties.Code.ZipFile = load_str("lambda_function.py") style="literal"' -i aws-resource-governor.yaml
+          sed 's/^/          /' lambda_function.py > temp_indented.py
+          sed -i '/# Python code here/r temp_indented.py' aws-resource-governor.yaml
           
           # Initialize policies array
           yq eval '.Resources.RestrictedIAMGroup.Properties.Policies = []' -i aws-resource-governor.yaml
