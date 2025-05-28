@@ -91,7 +91,8 @@ Resources:
           SNS_TOPIC_ARN: !Ref BillingAlertTopic
           ALLOWED_REGIONS: !Join [',', !Ref AllowedRegions]
       Code:
-        ZipFile: null
+        ZipFile: |
+          # Python code here
 
   # EventBridge Rule for configurable execution schedule
   ResourceGovernorScheduleRule:
