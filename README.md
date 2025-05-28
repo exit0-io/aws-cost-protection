@@ -4,7 +4,6 @@ An automated resource management and cost control system for AWS accounts that h
 
 ## Features
 
-
 - 🛑 **Automated Resource Management**: Stops EC2 instances and scales down ASGs twice daily
 - 🔒 **IAM Policies**: Restricts expensive instance types and services
 - 🌍 **Region Controls**: Limits resource creation to specified regions
