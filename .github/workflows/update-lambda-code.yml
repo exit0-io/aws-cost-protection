@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - 'lambda_function.py'
-      - 'aws-resource-governor.tpl.yaml'
+      - 'templates/aws-resource-governor.tpl.yaml'
       - 'policies/*.json'
   workflow_dispatch:
 
@@ -25,8 +25,11 @@ jobs:
       
       - name: Generate CloudFormation template with embedded code and policies
         run: |
+          
+          yq --version
+          
           # Copy template to final file
-          cp aws-resource-governor.tpl.yaml aws-resource-governor.yaml
+          cp templates/aws-resource-governor.tpl.yaml aws-resource-governor.yaml
           
           # Embed Lambda function code
           echo "Embedding Lambda function code..."
