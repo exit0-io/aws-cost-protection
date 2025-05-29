@@ -1,5 +1,5 @@
 """
-AWS Resource Governor Lambda Function
+AWS Learning Budget Keeper Lambda Function
 
 This function automatically manages AWS resources to control costs and enforce governance:
 - Stops running EC2 instances (except protected ones)
@@ -15,7 +15,7 @@ from typing import List, Dict, Any
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    print(f"Resource Governor Lambda triggered at {datetime.now(timezone.utc)}")
+    print(f"Learning Budget Keeper Lambda triggered at {datetime.now(timezone.utc)}")
     
     # Get target regions from environment variable
     target_regions_env = os.environ.get('TARGET_REGIONS', '*')

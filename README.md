@@ -1,9 +1,9 @@
-# AWS Resource Governor
+# AWS Learning Budget Keeper
 
 New AWS users often make simple mistakes that can accidentally lead to high bills — like forgetting to shut down an EC2 instance or choosing an expensive disk.
-To help you avoid that, we provide a ready-made **automation** that protects your account from these common issues.
+To help you avoid that, we provide a ready-made automation that protects your account from these common issues.
 
-This automation includes:
+This automation is based on an service called [AWS Lambda](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html), and includes:
 
 - ✅ Modifies your IAM group to restrict from launching large or expensive instance types and volumes.
 - ✅ Automatic shutdown of EC2 instances multiple times a day (you'll decide when), to avoid idle costs.
@@ -28,10 +28,10 @@ This automation is deployed using a **CloudFormation template** — an AWS tool 
 On the **Create stack** page, do one of the following:
 
 1. Choose **Choose an existing template**. Then, under **Specify template**, choose **Upload a template file**.
-2. Choose **Choose File** to choose a template file from your local computer. 
+2. Download the `aws-learning-budget-keeper.yaml` template file from this repository to your local computer, then choose **Choose File** and select the downloaded file.
 3. Once you have chosen your template, CloudFormation uploads the file and displays the S3 URL.
 4. Choose **Next** to continue and to validate the template.
-5. On the **Specify stack details** page, under **Stack name** type name to your stack, e.g. `aws-resource-governor`.
+5. On the **Specify stack details** page, under **Stack name** type name to your stack, e.g. `aws-learning-budget-keeper`.
 6. In the Parameters section, specify values for the following configurations:
    - **IAMGroup** - Name of the IAM group that you want to restrict. You should type the IAM group you created for your IAM user.
    - **AutoShutdownHours** - Times of day (in UTC) when instance shutdown automation should run.
