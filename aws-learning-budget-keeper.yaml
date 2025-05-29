@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'AWS Resource Governor Stack - Automated resource management and cost controls'
+Description: 'AWS Learning Budget Keeper Stack - Automated resource management and cost controls'
 
 Parameters:
   IAMGroup:
@@ -146,10 +146,10 @@ Resources:
         }
 
   # IAM Role for Lambda Function
-  ResourceGovernorLambdaRole:
+  LearningBudgetKeeperLambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: ResourceGovernorLambdaRole
+      RoleName: LearningBudgetKeeperLambdaRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -160,7 +160,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        - PolicyName: ResourceGovernancePolicy
+        - PolicyName: BudgetProtectionPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -180,41 +180,41 @@ Resources:
                 Resource: '*'
 
   # EventBridge Rule for configurable execution schedule
-  ResourceGovernorScheduleRule:
+  LearningBudgetKeeperScheduleRule:
     Type: AWS::Events::Rule
     Properties:
-      Name: resource-governor-schedule
-      Description: Trigger resource governance Lambda at specified UTC times
+      Name: learning-budget-keeper-schedule
+      Description: Trigger budget protection Lambda at specified UTC times
       ScheduleExpression: !Sub 'cron(0 ${AutoShutdownHours} * * ? *)'
       State: ENABLED
       Targets:
-        - Arn: !GetAtt ResourceGovernorLambda.Arn
-          Id: ResourceGovernorLambdaTarget
+        - Arn: !GetAtt LearningBudgetKeeperLambda.Arn
+          Id: LearningBudgetKeeperLambdaTarget
 
   # Permission for EventBridge to invoke Lambda
   LambdaInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !Ref ResourceGovernorLambda
+      FunctionName: !Ref LearningBudgetKeeperLambda
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
-      SourceArn: !GetAtt ResourceGovernorScheduleRule.Arn
+      SourceArn: !GetAtt LearningBudgetKeeperScheduleRule.Arn
 
   # CloudWatch Log Group for Lambda
-  ResourceGovernorLogGroup:
+  LearningBudgetKeeperLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '/aws/lambda/${ResourceGovernorLambda}'
+      LogGroupName: !Sub '/aws/lambda/${LearningBudgetKeeperLambda}'
       RetentionInDays: 30
 
-  # Lambda Function for Resource Governance
-  ResourceGovernorLambda:
+  # Lambda Function for Budget Protection
+  LearningBudgetKeeperLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: aws-resource-governor-function
+      FunctionName: aws-learning-budget-keeper-function
       Runtime: python3.12
       Handler: index.lambda_handler
-      Role: !GetAtt ResourceGovernorLambdaRole.Arn
+      Role: !GetAtt LearningBudgetKeeperLambdaRole.Arn
       Timeout: 300
       Environment:
         Variables:
@@ -222,7 +222,7 @@ Resources:
       Code:
         ZipFile: |
           """
-          AWS Resource Governor Lambda Function
+          AWS Learning Budget Keeper Lambda Function
           
           This function automatically manages AWS resources to control costs and enforce governance:
           - Stops running EC2 instances (except protected ones)
@@ -238,7 +238,7 @@ Resources:
           
           
           def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-              print(f"Resource Governor Lambda triggered at {datetime.now(timezone.utc)}")
+              print(f"Learning Budget Keeper Lambda triggered at {datetime.now(timezone.utc)}")
           
               # Get target regions from environment variable
               target_regions_env = os.environ.get('TARGET_REGIONS', '*')
